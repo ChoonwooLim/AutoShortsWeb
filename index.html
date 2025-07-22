@@ -55,7 +55,7 @@
 
             <!-- 새 영상 로드 버튼 (업로드 후 표시) -->
             <div class="new-video-section" id="newVideoSection" style="display: none;">
-                <button id="loadNewVideoButton" class="action-btn">🔄️ 새 영상 불러오기</button>
+                
             </div>
             
             <!-- 원본 영상 미리보기 (업로드 후 표시) -->
@@ -90,6 +90,7 @@
                             <option value="4">4x 배속</option>
                             <option value="8">8x 배속</option>
                         </select>
+                        <button id="loadNewVideoButton" class="control-btn" style="margin-left: auto;">🔄️ 영상 불러오기</button>
                     </div>
                 </div>
                 <div class="subtitle-control-panel">
@@ -991,8 +992,8 @@
                 <div class="modal-setting-item">
                     <label for="memoryLimitSlider">최대 메모리 사용량 (MB)</label>
                     <div style="display: flex; align-items: center; gap: 10px;">
-                        <input type="range" id="memoryLimitSlider" min="100" max="4096" step="100" value="100">
-                        <span id="memoryLimitValue">100 MB</span>
+                        <input type="range" id="memoryLimitSlider" min="100" max="4096" step="100" value="4096">
+                        <span id="memoryLimitValue">4096 MB</span>
                     </div>
                 </div>
                 <div class="setting-desc">

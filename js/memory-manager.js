@@ -1,6 +1,6 @@
 // js/memory-manager.js
 const MEMORY_LIMIT_KEY = 'memoryLimitMB';
-let memoryLimitMB = parseInt(localStorage.getItem(MEMORY_LIMIT_KEY) || '100', 10);
+let memoryLimitMB = parseInt(localStorage.getItem(MEMORY_LIMIT_KEY) || '4096', 10);
 let monitoringInterval;
 
 export function checkMemoryUsage() {

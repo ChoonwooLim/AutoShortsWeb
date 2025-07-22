@@ -4675,3 +4675,31 @@
             background-color: var(--accent-color);
             color: white;
         }
+
+        .video-controls select {
+            background-color: var(--background-color);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            padding: 5px;
+            color: white;
+        }
+
+        .video-main-container {
+            /* ... existing code ... */
+        }
+
+        #loadNewVideoButton {
+            background-color: #007bff; /* 눈에 띄는 파란색 */
+            color: white;
+            border-color: #007bff;
+        }
+
+        #loadNewVideoButton:hover {
+            background-color: #0056b3; /* 호버 시 더 어두운 파란색 */
+            border-color: #0056b3;
+        }
+
+        .video-main-container {
+            background-color: var(--background-light);
+        }

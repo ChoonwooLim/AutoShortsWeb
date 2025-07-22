@@ -252,6 +252,12 @@ class OptionsModalManager {
         if (clearCacheBtn) {
             clearCacheBtn.addEventListener('click', clearAllCache);
         }
+        
+        // 성능 모달 적용 버튼 이벤트 리스너
+        const applyPerformanceBtn = document.querySelector('#performanceCacheModal .modal-btn.primary');
+        if (applyPerformanceBtn) {
+            applyPerformanceBtn.addEventListener('click', applyPerformanceCacheOptions);
+        }
     }
 
     /**
@@ -667,6 +673,15 @@ function applyStorageManagementOptions() {
     }
 }
 
+function applyPerformanceCacheOptions() {
+    const memoryLimit = document.getElementById('memoryLimitSlider').value;
+    setMemoryLimit(memoryLimit);
+    alert(`최대 메모리 사용량이 ${memoryLimit}MB로 설정되었습니다.`);
+    if (window.optionsModalManager) {
+        window.optionsModalManager.closeModal('performanceCacheModal');
+    }
+}
+
 // 전역 함수로 노출
 window.applyVideoProcessingOptions = applyVideoProcessingOptions;
 window.applyAudioProcessingOptions = applyAudioProcessingOptions;
@@ -674,6 +689,7 @@ window.applyAdditionalFeaturesOptions = applyAdditionalFeaturesOptions;
 window.applyFaceAnalysisOptions = applyFaceAnalysisOptions;
 window.applyShortsSettingsOptions = applyShortsSettingsOptions;
 window.applyStorageManagementOptions = applyStorageManagementOptions;
+window.applyPerformanceCacheOptions = applyPerformanceCacheOptions;
 
 // 옵션 데이터 접근을 위한 전역 함수
 function getOptionData() {

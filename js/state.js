@@ -5,6 +5,9 @@ export const state = {
     /** @type {File | null} */
     uploadedFile: null,
 
+    /** @type {Uint8Array | null} */
+    uploadedFileData: null,
+
     /** @type {Array<object>} */
     subtitles: [],
 

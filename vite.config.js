@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import basicSsl from '@vitejs/plugin-basic-ssl';
+import { viteStaticCopy } from 'vite-plugin-static-copy';
 
 export default defineConfig({
   // 루트 디렉토리 설정 (프로젝트의 루트)
@@ -83,11 +84,11 @@ export default defineConfig({
     https: true, // HTTPS 활성화
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-origin-Embedder-Policy': 'require-corp',
     },
   },
   optimizeDeps: {
-    exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util'],
+    exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util', '@ffmpeg/core-mt'],
     include: ['d3-scale', 'face-api.js']
   },
   assetsInclude: [
@@ -101,7 +102,15 @@ export default defineConfig({
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
   },
   plugins: [
-    basicSsl() // HTTPS 플러그인 추가
+    basicSsl(), // HTTPS 플러그인 추가
+    viteStaticCopy({
+      targets: [
+        {
+          src: 'node_modules/@ffmpeg/core-mt/dist/umd/*',
+          dest: 'ffmpeg'
+        }
+      ]
+    })
   ],
   // 정적 파일 제공 설정
   publicDir: 'public',
