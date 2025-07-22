@@ -1,0 +1,1035 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoShorts Web</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="icon" type="image/x-icon" href="image/AutoShortsIco.ico">
+    
+    <!-- JSZip 라이브러리 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
+    <!-- TensorFlow.js와 Face-api.js는 필요 시 동적으로 로드됩니다. -->
+    
+    <!-- Google API는 필요시에만 로드하도록 변경 -->
+    <script>
+        // Google API 로딩 함수들을 전역으로 미리 정의
+        window.gapiLoaded = function() {
+            console.log('📦 Google API 로드됨');
+            if (window.handleGapiLoaded) {
+                window.handleGapiLoaded();
+            }
+        };
+        
+        window.gisLoaded = function() {
+            console.log('📦 Google Identity Services 로드됨');
+            if (window.handleGisLoaded) {
+                window.handleGisLoaded();
+            }
+        };
+             
+         // 테마 관리는 main.js에서 처리됩니다
+     </script>
+</head>
+<body>
+    <header class="main-header">
+        <h1>AutoShorts Web</h1>
+        <button id="themeToggle" class="theme-toggle-btn">🌙</button>
+    </header>
+    <div class="main-layout">
+        <!-- 왼쪽 패널: 설정 및 컨트롤 -->
+        <div class="left-panel">
+        
+            <!-- 파일 업로드 섹션 -->
+            <div class="upload-section" id="uploadContainer">
+                <div class="upload-icon">📁</div>
+                <h3>영상 파일을 드래그하거나 클릭하여 업로드</h3>
+                <p>MP4, AVI, MOV 파일 지원</p>
+                <input type="file" id="file-input" class="file-input" accept="video/*">
+                <div class="file-info" id="fileInfo">
+                    <p id="fileName"></p>
+                    <p id="fileSize"></p>
+                </div>
+            </div>
+
+            <!-- 새 영상 로드 버튼 (업로드 후 표시) -->
+            <div class="new-video-section" id="newVideoSection" style="display: none;">
+                <button id="loadNewVideoButton" class="action-btn">🔄️ 새 영상 불러오기</button>
+            </div>
+            
+            <!-- 원본 영상 미리보기 (업로드 후 표시) -->
+            <div class="video-preview-section" id="videoPreviewSection" style="display: none;">
+                <div class="video-main-container">
+                    <h3>📹&nbsp;원본 영상 미리보기</h3>
+                    <div class="video-container" id="originalVideoContainer">
+                        <video id="videoPreview" style="width: 100%;"></video>
+                    </div>
+                    <!-- 재생 위치 표시 -->
+                    <div class="video-progress-section">
+                        <div class="video-progress-bar" id="videoProgressBar" disabled>
+                            <div class="video-progress-fill" id="videoProgressFill"></div>
+                        </div>
+                        <div class="video-time-display" id="videoTimeDisplay">
+                            <span id="currentTime">0:00</span> / <span id="totalTime">0:00</span>
+                        </div>
+                    </div>
+
+                    <!-- 비디오 컨트롤 버튼들 -->
+                    <div class="video-controls">
+                        <button class="control-btn" id="skipToStartBtn" disabled>⏮️ 처음</button>
+                        <button class="control-btn" id="playBtn" disabled>▶️ 재생</button>
+                        <button class="control-btn" id="pauseBtn" disabled>⏸️ 일시정지</button>
+                        <button class="control-btn" id="stopBtn" disabled>⏹️ 정지</button>
+                        <button class="control-btn" id="rewindBtn" disabled>⏪ 되감기</button>
+                        <button class="control-btn" id="fastForwardBtn" disabled>⏩ 빨리감기</button>
+                        <button class="control-btn" id="skipToEndBtn" disabled>⏭️ 끝</button>
+                        <select id="playbackSpeedSelect" class="setting-input" disabled style="width: auto; margin-left: 10px;">
+                            <option value="1">1x 배속</option>
+                            <option value="2">2x 배속</option>
+                            <option value="4">4x 배속</option>
+                            <option value="8">8x 배속</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="subtitle-control-panel">
+                    <div class="subtitle-header">
+                        <h3>🎙️ 자막 추출 설정</h3>
+                    </div>
+                    <div class="stt-model-selector">
+                        <label>
+                            <input type="radio" name="stt-model" value="google" checked> Google
+                        </label>
+                        <label>
+                            <input type="radio" name="stt-model" value="openai"> OpenAI
+                        </label>
+                    </div>
+                    
+                    <!-- 압축 방식 선택 -->
+                    <div class="compression-method-selector">
+                        <h4>🎵 압축 방식</h4>
+                        <div class="compression-options">
+                            <label>
+                                <input type="radio" name="compression-method" value="mediarecorder" checked>
+                                <span class="method-name">브라우저 압축</span>
+                                <span class="method-desc">안정적, 호환성 좋음</span>
+                            </label>
+                            <label>
+                                <input type="radio" name="compression-method" value="ffmpeg-wasm">
+                                <span class="method-name">FFmpeg.wasm</span>
+                                <span class="method-desc">고성능, 전문가용</span>
+                            </label>
+                            <label>
+                                <input type="radio" name="compression-method" value="web-workers">
+                                <span class="method-name">백그라운드 처리</span>
+                                <span class="method-desc">UI 블로킹 없음</span>
+                            </label>
+                        </div>
+                    </div>
+                     <div class="subtitle-controls">
+                        <button id="startTranscriptionBtn" class="action-btn" disabled onclick="loadTranscriptionModules()">🎙️ 자막 추출 시작</button>
+                        <button id="generateDummySubtitleBtn" class="action-btn dev-mode" onclick="loadTranscriptionModules()">🧪 더미 자막 생성</button>
+                        <div class="language-selector">
+                            <label for="sourceLang">언어:</label>
+                            <select id="sourceLang">
+                                <option value="ko-KR" selected>한국어</option>
+                                <option value="en-US">영어</option>
+                                <option value="ja-JP">일본어</option>
+                                <option value="zh-CN">중국어 (간체)</option>
+                                <option value="zh-TW">중국어 (번체)</option>
+                                <option value="es-ES">스페인어</option>
+                                <option value="fr-FR">프랑스어</option>
+                                <option value="de-DE">독일어</option>
+                                <option value="it-IT">이탈리아어</option>
+                                <option value="pt-BR">포르투갈어</option>
+                                <option value="ru-RU">러시아어</option>
+                                <option value="ar-SA">아랍어</option>
+                                <option value="hi-IN">힌디어</option>
+                                <option value="th-TH">태국어</option>
+                                <option value="vi-VN">베트남어</option>
+                            </select>
+                        </div>
+                    </div>
+                    <!-- 자막 추출 진행률 표시 -->
+                    <div class="transcription-progress" id="transcriptionProgress" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="transcriptionProgressFill"></div>
+                        </div>
+                        <div class="progress-text" id="transcriptionProgressText">자막 추출 준비 중...</div>
+                        <div class="progress-details" id="transcriptionProgressDetails"></div>
+                    </div>
+                    
+
+                    
+                    <!-- 기존 자막 컨테이너는 숨김 (호환성 유지) -->
+                    <div id="subtitleContainer" class="subtitle-container" style="display: none;">
+                        <div class="subtitle-placeholder">동영상 업로드 후 "자막 추출 시작" 버튼을 클릭하세요.</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="videoEditorContainer" style="display: none;">
+                <!-- This container is now obsolete -->
+            </div>
+
+            <!-- 옵션 버튼 섹션 -->
+            <div class="options-button-grid">
+                    <button class="option-button" id="videoProcessingBtn" data-category="video">
+                        <div class="option-icon">📼</div>
+                        <div class="option-title">영상 처리</div>
+                        <div class="option-count" id="videoCount">4개 선택됨</div>
+                    </button>
+                    <button class="option-button" id="audioProcessingBtn" data-category="audio">
+                        <div class="option-icon">🔊</div>
+                        <div class="option-title">오디오 처리</div>
+                        <div class="option-count" id="audioCount">3개 선택됨</div>
+                    </button>
+                    <button class="option-button" id="additionalFeaturesBtn" data-category="features">
+                        <div class="option-icon">📝</div>
+                        <div class="option-title">추가 기능</div>
+                        <div class="option-count" id="featuresCount">0개 선택됨</div>
+                    </button>
+                    <button class="option-button" id="faceAnalysisBtn" data-category="face">
+                        <div class="option-icon">🎭</div>
+                        <div class="option-title">배우얼굴분석</div>
+                        <div class="option-count" id="faceCount">비활성화</div>
+                    </button>
+                    <button class="option-button" id="shortsSettingsBtn" data-category="shorts">
+                        <div class="option-icon">⚙️</div>
+                        <div class="option-title">숏츠 생성 설정</div>
+                        <div class="option-count" id="shortsCount">기본 설정</div>
+                    </button>
+                    <button class="option-button" id="storageManagementBtn" data-category="storage">
+                        <div class="option-icon">📁</div>
+                        <div class="option-title">저장 관리</div>
+                        <div class="option-count" id="storageCount">설정 필요</div>
+                    </button>
+                    <button class="option-button" data-category="performance">
+                        <i class="fas fa-tachometer-alt option-icon"></i>
+                        <span class="option-title">성능 및 캐시</span>
+                        <span class="option-count" id="performanceCount">기본값</span>
+                    </button>
+                </div>
+
+            <!-- 숨겨진 기존 옵션들 (JavaScript에서 접근용) -->
+            <div style="display: none;">
+                <input type="checkbox" id="autoHighlight" name="video_processing" value="highlight" checked>
+                <input type="checkbox" id="autoCrop" name="video_processing" value="crop" checked>
+                <input type="checkbox" id="colorCorrection" name="video_processing" value="color" checked>
+                <input type="checkbox" id="videoStabilization" name="video_processing" value="stabilize">
+                
+                <input type="checkbox" id="removeSilence" name="audio_processing" value="silence" checked>
+                <input type="checkbox" id="enhanceAudio" name="audio_processing" value="enhance" checked>
+                <input type="checkbox" id="noiseReduction" name="audio_processing" value="noise" checked>
+                
+                <input type="checkbox" id="addTitle" name="features" value="title">
+                <input type="checkbox" id="addSubtitles" name="features" value="subtitles">
+                <input type="checkbox" id="addEffects" name="features" value="effects">
+                <input type="checkbox" id="faceAnalysis" name="features" value="face_analysis" checked>
+                
+                <select id="shortsLength" class="setting-input">
+                    <option value="15">15초</option>
+                    <option value="30">30초</option>
+                    <option value="45">45초</option>
+                    <option value="60" selected>60초</option>
+                </select>
+                <input type="number" id="shortsCount" class="setting-input" value="1" min="1" max="10">
+                
+                <input type="text" id="outputFolder" class="setting-input" placeholder="폴더를 선택하세요" readonly>
+                <input type="checkbox" id="autoSave">
+                <select id="fileNaming" class="setting-input">
+                    <option value="timestamp">타임스탬프 (20241220_143022)</option>
+                    <option value="sequential">순차번호 (shorts_001, shorts_002)</option>
+                    <option value="custom">사용자 정의</option>
+                </select>
+                <input type="text" id="customName" class="setting-input" placeholder="예: MyShorts">
+            </div>
+
+            <!-- 모달 팝업들 -->
+            <!-- 영상 처리 모달 -->
+            <div id="videoProcessingModal" class="option-modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>📼 영상 처리 옵션</h3>
+                        <button class="modal-close" data-modal="videoProcessingModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="modal-option-item">
+                            <input type="checkbox" id="modal-autoHighlight" checked>
+                            <label for="modal-autoHighlight">
+                                <div class="option-info">
+                                    <div class="option-name">자동 하이라이트 추출</div>
+                                    <div class="option-desc">영상에서 주요 구간을 자동으로 추출합니다.</div>
+                                </div>
+                            </label>
+                            <div class="sub-options" id="highlightOptionsContainer" style="display: block; margin-left: 25px; margin-top: 10px;">
+                                <div class="highlight-setting-item" style="margin-bottom: 10px;">
+                                    <label for="highlight-count">만들 영상 개수:</label>
+                                    <input type="number" id="highlight-count" class="modal-setting-input" value="3" min="1" max="10" style="width: 60px;">
+                                </div>
+                                <div class="highlight-setting-item">
+                                    <label>선택된 프롬프트:</label>
+                                    <div id="selected-prompts-list" class="selected-items-display"></div>
+                                    <button id="openPromptModalBtn" class="modal-btn-inline">프롬프트 선택</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-option-item">
+                            <input type="checkbox" id="modal-aspectRatioAdjust" checked>
+                            <label for="modal-aspectRatioAdjust">
+                                <div class="option-info">
+                                    <div class="option-name">영상 비율 조정</div>
+                                    <div class="option-desc">영상의 가로세로 비율을 조정합니다.</div>
+                                </div>
+                            </label>
+                            <div class="sub-options" id="cropOptionsContainer" style="display: block; margin-left: 25px; margin-top: 10px;">
+                                <div class="radio-option" style="margin-bottom: 5px;">
+                                    <input type="radio" id="crop-auto" name="crop-type" value="auto" checked>
+                                    <label for="crop-auto">자동 크롭</label>
+                                </div>
+                                <div class="radio-option">
+                                    <input type="radio" id="crop-manual" name="crop-type" value="manual">
+                                    <label for="crop-manual">수동 크롭</label>
+                                </div>
+                                <div class="manual-crop-formats" id="manualCropFormatContainer" style="display: none; margin-left: 20px; margin-top: 15px;">
+                                    <select id="manualCropFormatSelect" class="modal-setting-select" style="height: 50px; width: 100%; max-width: 300px;">
+                                        <option value="9:16">9:16 (세로 영상 - 숏폼)</option>
+                                        <option value="1:1">1:1 (정사각형 - 인스타그램)</option>
+                                        <option value="16:9">16:9 (가로 영상 - 유튜브)</option>
+                                        <option value="4:3">4:3 (구형 TV 비율)</option>
+                                        <option value="2.39:1">2.39:1 (시네마스코프)</option>
+                                        <option value="custom">사용자 정의</option>
+                                    </select>
+                                    <div class="custom-crop-size" id="customCropSizeContainer" style="display: none; margin-top: 15px; display: flex; align-items: center; justify-content: space-between; max-width: 300px;">
+                                        <input type="number" id="manualCropWidth" class="modal-setting-input" placeholder="너비" style="width: 45%;">
+                                        <span style="width: auto;">x</span>
+                                        <input type="number" id="manualCropHeight" class="modal-setting-input" placeholder="높이" style="width: 45%;">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-option-item">
+                            <input type="checkbox" id="modal-colorCorrection" checked>
+                            <label for="modal-colorCorrection">
+                                <div class="option-info">
+                                    <div class="option-name">색상 보정</div>
+                                    <div class="option-desc">영상의 색상을 자동으로 보정합니다.</div>
+                                </div>
+                            </label>
+                            <div class="manual-color-settings" id="manualColorSettingsContainer" style="display: block; margin-left: 25px; margin-top: 10px;">
+                                <div class="slider-container">
+                                    <label for="modal-brightness" class="slider-label">밝기</label>
+                                    <input type="range" id="modal-brightness" class="color-slider" min="-100" max="100" value="0">
+                                    <span class="slider-value" id="brightness-value">0</span>
+                                </div>
+                                <div class="slider-container">
+                                    <label for="modal-contrast" class="slider-label">대비</label>
+                                    <input type="range" id="modal-contrast" class="color-slider" min="-100" max="100" value="0">
+                                    <span class="slider-value" id="contrast-value">0</span>
+                                </div>
+                                <div class="slider-container">
+                                    <label for="modal-saturation" class="slider-label">채도</label>
+                                    <input type="range" id="modal-saturation" class="color-slider" min="-100" max="100" value="0">
+                                    <span class="slider-value" id="saturation-value">0</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-option-item">
+                            <input type="checkbox" id="modal-videoStabilization">
+                            <label for="modal-videoStabilization">
+                                <div class="option-info">
+                                    <div class="option-name">영상 안정화</div>
+                                    <div class="option-desc">손떨림이나 흔들림을 보정합니다</div>
+                                </div>
+                            </label>
+                        </div>
+                        <div class="modal-option-item">
+                            <div class="option-info" style="width: 100%;">
+                                <div class="option-name">영상 분할 저장</div>
+                                <div class="option-desc">영상을 지정된 시간 단위로 분할하여 저장합니다.</div>
+                                <div class="split-duration-setting" style="margin-top: 10px;">
+                                    <label for="modal-splitDuration" style="margin-right: 10px;">분할 시간(분):</label>
+                                    <input type="number" id="modal-splitDuration" class="modal-setting-input" value="20" min="1" style="width: 80px;">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="modal-btn special" id="startVideoSplitBtn">분할 실행</button>
+                        <button class="modal-btn secondary" data-modal="videoProcessingModal">취소</button>
+                        <button class="modal-btn primary" onclick="applyVideoProcessingOptions()">적용</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 오디오 처리 모달 -->
+            <div id="audioProcessingModal" class="option-modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>🔊 오디오 처리 옵션</h3>
+                        <button class="modal-close" data-modal="audioProcessingModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="modal-option-item">
+                            <input type="checkbox" id="modal-removeSilence" checked>
+                            <label for="modal-removeSilence">
+                                <div class="option-info">
+                                    <div class="option-name">무음 구간 제거</div>
+                                    <div class="option-desc">조용한 구간을 자동으로 제거하여 영상 길이를 단축합니다</div>
+                                </div>
+                            </label>
+                        </div>
+                        <div class="modal-option-item">
+                            <input type="checkbox" id="modal-enhanceAudio" checked>
+                            <label for="modal-enhanceAudio">
+                                <div class="option-info">
+                                    <div class="option-name">오디오 향상</div>
+                                    <div class="option-desc">음성을 더 선명하고 깨끗하게 개선합니다</div>
+                                </div>
+                            </label>
+                        </div>
+                        <div class="modal-option-item">
+                            <input type="checkbox" id="modal-noiseReduction" checked>
+                            <label for="modal-noiseReduction">
+                                <div class="option-info">
+                                    <div class="option-name">노이즈 감소</div>
+                                    <div class="option-desc">배경 소음이나 불필요한 소리를 제거합니다</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="modal-btn secondary" data-modal="audioProcessingModal">취소</button>
+                        <button class="modal-btn primary" onclick="applyAudioProcessingOptions()">적용</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 추가 기능 모달 -->
+            <div id="additionalFeaturesModal" class="option-modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>📝 추가 기능 옵션</h3>
+                        <button class="modal-close" data-modal="additionalFeaturesModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="modal-option-item">
+                            <input type="checkbox" id="modal-addTitle">
+                            <label for="modal-addTitle">
+                                <div class="option-info">
+                                    <div class="option-name">타이틀 추가</div>
+                                    <div class="option-desc">영상에 매력적인 제목을 자동으로 생성하여 추가합니다</div>
+                                </div>
+                            </label>
+                        </div>
+                        <div class="modal-option-item">
+                            <input type="checkbox" id="modal-addSubtitles">
+                            <label for="modal-addSubtitles">
+                                <div class="option-info">
+                                    <div class="option-name">자막 추가</div>
+                                    <div class="option-desc">음성을 인식하여 자동으로 자막을 생성합니다</div>
+                                </div>
+                            </label>
+                        </div>
+                        <div class="modal-option-item">
+                            <input type="checkbox" id="modal-addEffects">
+                            <label for="modal-addEffects">
+                                <div class="option-info">
+                                    <div class="option-name">영상효과 추가</div>
+                                    <div class="option-desc">트렌디한 시각 효과와 트랜지션을 추가합니다</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="modal-btn secondary" data-modal="additionalFeaturesModal">취소</button>
+                        <button class="modal-btn primary" onclick="applyAdditionalFeaturesOptions()">적용</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 숏츠 생성 설정 모달 -->
+            <div id="shortsSettingsModal" class="option-modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>⚙️ 숏츠 생성 설정</h3>
+                        <button class="modal-close" data-modal="shortsSettingsModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="modal-setting-item">
+                            <label for="modal-shortsLength">영상 길이</label>
+                            <select id="modal-shortsLength" class="modal-setting-input">
+                                <option value="15">15초</option>
+                                <option value="30">30초</option>
+                                <option value="45">45초</option>
+                                <option value="60" selected>60초</option>
+                            </select>
+                            <div class="setting-desc">생성할 숏츠 영상의 길이를 선택하세요</div>
+                        </div>
+                        <div class="modal-setting-item">
+                            <label for="modal-shortsCountNum">생성 개수</label>
+                            <input type="number" id="modal-shortsCountNum" class="modal-setting-input" value="1" min="1" max="10">
+                            <div class="setting-desc">한 번에 생성할 숏츠 영상의 개수를 설정하세요</div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="modal-btn secondary" data-modal="shortsSettingsModal">취소</button>
+                        <button class="modal-btn primary" onclick="applyShortsSettingsOptions()">적용</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 저장 관리 모달 -->
+            <div id="storageManagementModal" class="option-modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>📁 저장 관리 설정</h3>
+                        <button class="modal-close" data-modal="storageManagementModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="modal-setting-item">
+                            <label for="modal-outputFolder">저장 폴더</label>
+                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                <input type="text" id="modal-outputFolder" class="modal-setting-input" placeholder="폴더를 선택하세요" readonly style="flex: 1;">
+                                <button id="modal-selectFolderBtn" class="modal-folder-btn">📁</button>
+                            </div>
+                            <div class="setting-desc">생성된 숏츠 영상을 저장할 폴더를 선택하세요</div>
+                        </div>
+                        <div class="modal-setting-item">
+                            <label class="modal-checkbox-label">
+                                <input type="checkbox" id="modal-autoSave">
+                                <span class="checkmark"></span>
+                                자동 저장
+                            </label>
+                            <div class="setting-desc">영상 생성 완료 시 자동으로 저장합니다</div>
+                        </div>
+                        <div class="modal-setting-item">
+                            <label for="modal-fileNaming">파일명 형식</label>
+                            <select id="modal-fileNaming" class="modal-setting-input">
+                                <option value="timestamp">타임스탬프 (20241220_143022)</option>
+                                <option value="sequential">순차번호 (shorts_001, shorts_002)</option>
+                                <option value="custom">사용자 정의</option>
+                            </select>
+                            <div class="setting-desc">저장될 파일의 이름 형식을 선택하세요</div>
+                        </div>
+                        <div class="modal-setting-item" id="modal-customNameContainer" style="display: none;">
+                            <label for="modal-customName">사용자 정의명</label>
+                            <input type="text" id="modal-customName" class="modal-setting-input" placeholder="예: MyShorts">
+                            <div class="setting-desc">파일명에 사용할 접두사를 입력하세요</div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="modal-btn secondary" data-modal="storageManagementModal">취소</button>
+                        <button class="modal-btn primary" onclick="applyStorageManagementOptions()">적용</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 배우얼굴분석 모달 -->
+            <div id="faceAnalysisModal" class="option-modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>🎭 배우얼굴분석</h3>
+                        <button class="modal-close" data-modal="faceAnalysisModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="modal-option-item">
+                            <input type="checkbox" id="modal-faceAnalysisEnable" checked>
+                            <label for="modal-faceAnalysisEnable">
+                                <div class="option-info">
+                                    <div class="option-name">배우얼굴분석 활성화</div>
+                                    <div class="option-desc">AI 얼굴 인식으로 주요 인물을 중심으로 최적의 프레이밍을 찾습니다</div>
+                                </div>
+                            </label>
+                        </div>
+                        <div class="modal-option-item">
+                            <input type="checkbox" id="modal-faceTracking">
+                            <label for="modal-faceTracking">
+                                <div class="option-info">
+                                    <div class="option-name">얼굴 추적</div>
+                                    <div class="option-desc">인물의 움직임을 추적하여 부드러운 카메라 워크를 적용합니다</div>
+                                </div>
+                            </label>
+                        </div>
+                        <div class="modal-option-item">
+                            <input type="checkbox" id="modal-expressionAnalysis">
+                            <label for="modal-expressionAnalysis">
+                                <div class="option-info">
+                                    <div class="option-name">표정 분석</div>
+                                    <div class="option-desc">감정 표현이 풍부한 순간을 우선적으로 선택합니다</div>
+                                </div>
+                            </label>
+                        </div>
+                        <div class="modal-option-item">
+                            <input type="checkbox" id="modal-multiplePersons">
+                            <label for="modal-multiplePersons">
+                                <div class="option-info">
+                                    <div class="option-name">다중 인물 감지</div>
+                                    <div class="option-desc">여러 인물이 있는 경우 모두 포함하도록 프레이밍을 조정합니다</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="modal-btn secondary" data-modal="faceAnalysisModal">취소</button>
+                        <button class="modal-btn primary" onclick="applyFaceAnalysisOptions()">적용</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 작업 로그 모달 -->
+            <div id="workLogModal" class="option-modal">
+                <div class="modal-content work-log-modal">
+                    <div class="modal-header">
+                        <h3>📝 작업 로그</h3>
+                        <button class="modal-close" data-modal="workLogModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- 작업 로그 통계 -->
+                        <div class="work-log-stats">
+                            <div class="stat-item">
+                                <div class="stat-number" id="totalWorkCount">0</div>
+                                <div class="stat-label">전체 작업</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number" id="todayWorkCount">0</div>
+                                <div class="stat-label">오늘 작업</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number" id="activeDaysCount">0</div>
+                                <div class="stat-label">활동 일수</div>
+                            </div>
+                        </div>
+
+                        <!-- 날짜 필터 -->
+                        <div class="work-log-filters">
+                            <div class="filter-group">
+                                <label for="workLogDateFilter">날짜 필터:</label>
+                                <select id="workLogDateFilter" class="modal-setting-input">
+                                    <option value="all">전체</option>
+                                    <option value="today">오늘</option>
+                                    <option value="yesterday">어제</option>
+                                    <option value="this-week">이번 주</option>
+                                    <option value="this-month">이번 달</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label for="workLogTypeFilter">작업 유형:</label>
+                                <select id="workLogTypeFilter" class="modal-setting-input">
+                                    <option value="all">전체</option>
+                                    <option value="upload">파일 업로드</option>
+                                    <option value="transcription">자막 추출</option>
+                                    <option value="processing">영상 처리</option>
+                                    <option value="chat">AI 대화</option>
+                                    <option value="settings">설정 변경</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- 작업 로그 목록 -->
+                        <div class="work-log-list" id="workLogList">
+                            <div class="work-log-empty">
+                                <div class="empty-icon">📋</div>
+                                <div class="empty-text">아직 작업 로그가 없습니다.</div>
+                                <div class="empty-desc">AutoShorts를 사용하면 자동으로 작업 기록이 생성됩니다.</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="modal-btn secondary" onclick="exportWorkLogs()">📤 내보내기</button>
+                        <button class="modal-btn danger" onclick="clearWorkLogs()">🗑️ 전체 삭제</button>
+                        <button class="modal-btn primary" data-modal="workLogModal">닫기</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-area">
+                <div class="chat-list-panel">
+                    <div class="chat-list-header">
+                        <h3>대화 목록</h3>
+                        <input type="checkbox" id="selectAllChats" title="전체 선택">
+                    </div>
+                    <div class="chat-list" id="chatList">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                    <div class="chat-list-actions">
+                        <button id="saveChatsBtn" title="모든 대화 저장">💾 저장</button>
+                        <button id="loadChatsBtn" title="파일에서 불러오기">📂 불러오기</button>
+                        <input type="file" id="loadChatsInput" style="display: none;" accept=".json">
+                        <button id="deleteChatsBtn" title="선택 대화 삭제">🗑️ 삭제</button>
+                    </div>
+                </div>
+                
+                <div class="chat-panel">
+                    <div class="chat-header">
+                        <h3>AI 어시스턴트</h3>
+                        <button id="newChatBtn">새 대화</button>
+                    </div>
+                    <div class="chat-history" id="chatHistory">
+                        <!-- Chat messages will be appended here -->
+                    </div>
+                </div>
+            </div>
+            
+            <div class="selection-container">
+                <div class="dark-selection-box platform-box">
+                    <div class="platform-group">
+                        <div class="platform-card" data-platform="youtube_shorts">
+                            <div class="platform-icon">📺</div>
+                            YouTube Shorts
+                        </div>
+                        <div class="platform-card" data-platform="instagram_reels">
+                            <div class="platform-icon">📸</div>
+                            Instagram Reels
+                        </div>
+                        <div class="platform-card" data-platform="tiktok">
+                            <div class="platform-icon">🎵</div>
+                            TikTok
+                        </div>
+                        <div class="platform-card" data-platform="naver">
+                            <div class="platform-icon">KR</div>
+                            네이버
+                        </div>
+                        <div class="platform-card" data-platform="facebook_reels">
+                            <div class="platform-icon">👥</div>
+                            Facebook Reels
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dark-selection-box ai-model-box">
+                    <!-- 이미지 미리보기 영역 -->
+                    <div id="imagePreviewContainer" class="image-preview-container" style="display: none;">
+                        <div class="image-preview-header">
+                            <span>📷 업로드된 이미지</span>
+                            <button id="removeImageBtn" class="remove-image-btn">✕</button>
+                        </div>
+                        <div class="image-preview-wrapper">
+                            <img id="previewImage" alt="업로드된 이미지" />
+                            <div class="image-info">
+                                <span id="imageFileName">파일명</span>
+                                <span id="imageFileSize">크기</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-input-area">
+                        <div class="input-wrapper">
+                            <textarea id="chatInput" placeholder="메시지 입력..." rows="1"></textarea>
+                            <div class="input-actions">
+                                <button id="imageUploadBtn" class="action-btn" title="이미지 업로드">📷</button>
+                                <button id="videoAnalysisBtn" class="action-btn" title="동영상 분석 요청" style="display: none;">🎬</button>
+                                <button id="sendChatBtn" disabled>전송</button>
+                            </div>
+                        </div>
+                        <input type="file" id="imageInput" accept="image/*" style="display: none;">
+                    </div>
+                    <div class="ai-model-container">
+                        <select id="mainModelSelect" class="setting-input"></select>
+                        <select id="subModelSelect" class="setting-input"></select>
+                        <button class="settings-btn" id="testAIBtn" title="AI 연결 테스트">🔬</button>
+                        <button class="settings-btn" id="apiSettingsBtn" title="API 키 설정">⚙️</button>
+                        <button class="settings-btn" id="googleConfigBtn" title="Google 설정">🔐</button>
+                        <button class="settings-btn" id="workLogBtn" title="작업 로그 보기">📝</button>
+                    </div>
+                </div>
+                
+                <div class="dark-selection-box video-production-box">
+                    <!-- 숏츠영상 제작 -->
+                    <div class="video-production-item">
+                        <div class="production-header">
+                            <button id="processShortsBtn" class="process-btn shorts-btn" disabled>
+                                📱 숏츠 제작실행
+                            </button>
+                            <select class="aspect-ratio-select" id="shortsAspectRatio">
+                                <option value="9:16" selected>9:16 (세로형)</option>
+                                <option value="1:1">1:1 (정사각형)</option>
+                                <option value="4:5">4:5 (인스타그램)</option>
+                                <option value="16:9">16:9 (가로형)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 🚀 신규: 프로젝트 관리 섹션 -->
+                    <div class="project-management-section">
+                        <h3 class="section-title">
+                            <i class="fas fa-folder"></i> 프로젝트 관리
+                        </h3>
+                        <div class="project-actions">
+                            <button id="saveProjectBtn" class="project-btn save">
+                                <i class="fas fa-save"></i> 프로젝트 저장
+                            </button>
+                            <button id="loadProjectBtn" class="project-btn load">
+                                <i class="fas fa-folder-open"></i> 프로젝트 불러오기
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 일반영상 제작 -->
+                    <div class="video-production-item">
+                        <div class="production-header">
+                            <button id="processGeneralBtn" class="process-btn general-btn" disabled>
+                                🖥️ 일반영상 제작실행
+                            </button>
+                            <select class="aspect-ratio-select" id="generalAspectRatio">
+                                <option value="16:9" selected>16:9 (가로형)</option>
+                                <option value="21:9">21:9 (시네마)</option>
+                                <option value="4:3">4:3 (클래식)</option>
+                                <option value="9:16">9:16 (세로형)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 배우 얼굴 갤러리 섹션 -->
+            <div class="face-gallery-container" id="faceGalleryContainer" style="display: block;">
+                <h3>🎭 배우 얼굴 갤러리</h3>
+                <div class="face-gallery-controls">
+                    <button class="btn btn-secondary" id="analyzeFacesBtn">얼굴 분석 시작</button>
+                    <button class="btn btn-secondary" id="analyzeFacesBtnV2" style="background-color: #007bff; color: white;">얼굴 분석 (V2)</button>
+                </div>
+                <div style="text-align: center; margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.9rem;">
+                    🎯 <strong>실제 얼굴 인식 시스템:</strong><br>
+                    • <span style="color: #00bcd4;">Face-api.js</span>로 영상에서 실제 배우 얼굴 감지<br>
+                    • <span style="color: #ff9800;">나이, 성별, 표정</span> 자동 분석<br>
+                    • <span style="color: #4caf50;">얼굴별 등장 횟수</span> 및 시간 추적<br>
+                    • <span style="color: #9c27b0;">같은 인물 자동 그룹화</span> (AI 유사도 계산)
+                </div>
+                <div class="analysis-progress" id="analysisProgress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="faceProgressFill"></div>
+                    </div>
+                    <div class="progress-text" id="faceProgressText">얼굴 분석 중...</div>
+                </div>
+                <div class="face-results" id="faceResults">
+                    <!-- 분석된 얼굴들이 여기에 표시됩니다 -->
+                </div>
+            </div>
+
+            <!-- 배우 얼굴 갤러리 섹션 (V2) -->
+            <div class="face-gallery-container" id="faceGalleryContainerV2" style="display: block; margin-top: 20px; border-top: 1px solid #444; padding-top: 20px;">
+                <h3>🎭 배우 얼굴 갤러리 (V2)</h3>
+                <div class="merge-controls" style="display: none; margin-bottom: 15px; text-align: center;">
+                    <button id="mergeActorsBtn" class="btn btn-primary" disabled>✔️ 선택한 인물 병합</button>
+                </div>
+                <div id="faceResultsV2" class="face-results">
+                    <p style="text-align: center; color: #888;">새로운 얼굴 분석 결과를 여기에 표시합니다.</p>
+                </div>
+                <div id="analysisProgressV2" style="display: none; margin-top: 15px;">
+                    <p id="progressTextV2" style="text-align: center; margin-bottom: 5px;"></p>
+                    <div class="progress-bar" style="background-color: #555;">
+                        <div id="progressBarFillV2" class="progress-fill" style="width: 0%; background-color: #007bff;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 진행률 표시 -->
+            <div class="progress-section" id="progressSection">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="status-text" id="statusText">처리 중...</div>
+            </div>
+        </div>
+
+        <!-- 오른쪽 패널: 결과 -->
+        <div class="right-panel">
+            <div id="resultsContainer">
+                <!-- 상단: 완성된 숏츠 영상 (60%) -->
+                <div class="results-upper-section">
+                    <div class="title-box">
+                        <h3>✅ 완성된 숏츠 영상</h3>
+                    </div>
+                    <div class="shorts-carousel">
+                        <button class="carousel-btn prev" id="prevShortBtn">‹</button>
+                        <div class="shorts-viewport">
+                            <div id="shortsTrack">
+                                <!-- JS will populate this -->
+                            </div>
+                        </div>
+                        <button class="carousel-btn next" id="nextShortBtn">›</button>
+                    </div>
+                    <div id="shorts-counter"></div>
+                    <div id="completedShortsGrid" style="display: none;">
+                        <!-- This is now unused, but kept for safety, will be controlled by JS -->
+                    </div>
+                </div>
+                
+                <!-- 하단: 추출된 자막 (40%) -->
+                <div class="results-lower-section">
+                    <div class="subtitle-results-header">
+                        <h3>📝 추출된 자막</h3>
+                        <div class="subtitle-actions">
+                            <button id="copySubtitleBtn" class="subtitle-action-btn" title="자막 복사">📋</button>
+                            <button id="downloadSubtitleBtn" class="subtitle-action-btn" title="자막 다운로드">💾</button>
+                            <button id="clearSubtitleBtn" class="subtitle-action-btn" title="자막 지우기">🗑️</button>
+                        </div>
+                    </div>
+                    <div class="subtitle-results-container" id="subtitleResultsContainer">
+                        <div class="subtitle-placeholder-results">
+                            <div class="placeholder-icon">🎙️</div>
+                            <p>영상을 업로드하고 자막 추출을 시작하세요</p>
+                            <span>추출된 자막이 여기에 표시됩니다</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 업로드 모달 -->
+    <div class="upload-modal" id="uploadModal">
+        <div class="upload-modal-content">
+            <h3 id="modalTitle">플랫폼 업로드</h3>
+            <form class="upload-form" id="uploadForm">
+                <div class="form-group">
+                    <label for="videoTitle">제목</label>
+                    <input type="text" id="videoTitle" required>
+                </div>
+                <div class="form-group">
+                    <label for="videoDescription">설명</label>
+                    <textarea id="videoDescription" placeholder="영상에 대한 설명을 입력하세요..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="videoTags">태그 (쉼표로 구분)</label>
+                    <input type="text" id="videoTags" placeholder="예: 숏츠, 유튜브, 재미있는">
+                </div>
+            </form>
+            <div class="modal-actions">
+                <button class="modal-btn cancel" id="cancelUpload">취소</button>
+                <button class="modal-btn upload" id="confirmUpload">업로드</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- API Key Modal -->
+    <div id="apiKeyModal" class="api-key-modal">
+        <div class="modal-content">
+            <span class="close-button" id="closeApiKeyModalBtn">&times;</span>
+            <h3 id="apiKeyModalTitle">API 키 설정</h3>
+            <div class="form-group">
+                <div class="form-label-group">
+                    <label for="apiKeyInput">API 키</label>
+                    <a href="#" id="apiKeyLink" target="_blank" rel="noopener noreferrer">API 키 발급받기 &nearr;</a>
+                </div>
+                <input type="password" id="apiKeyInput" class="form-group-input">
+            </div>
+            <div class="modal-actions">
+                <button id="cancelApiKeyBtn" class="btn btn-secondary">취소</button>
+                <button id="saveApiKeyBtn" class="btn btn-primary">저장</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Google Config Modal -->
+    <div id="googleConfigModal" class="api-key-modal">
+        <div class="modal-content">
+            <span class="close-button" id="closeGoogleConfigModalBtn">&times;</span>
+            <h3>🔐 Google 인증 설정</h3>
+            <div class="form-group">
+                <div class="form-label-group">
+                    <label for="googleClientIdInput">Google Client ID</label>
+                    <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">Google Cloud Console &nearr;</a>
+                </div>
+                <input type="text" id="googleClientIdInput" class="form-group-input" placeholder="your-project-id.apps.googleusercontent.com">
+                <div class="google-config-info">
+                    <p id="currentGoogleConfigInfo" style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.5rem;"></p>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="resetGoogleConfigBtn" class="btn btn-secondary">기본값 사용</button>
+                <button id="cancelGoogleConfigBtn" class="btn btn-secondary">취소</button>
+                <button id="saveGoogleConfigBtn" class="btn btn-primary">저장</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Modal -->
+    <div id="imageModal" class="image-modal">
+        <span class="image-modal-close" onclick="closeImageModal()">&times;</span>
+        <img id="imageModalContent" class="image-modal-content">
+    </div>
+
+    <!-- ================================== -->
+    <!--  프롬프트 선택 모달 (Prompt Selection Modal)  -->
+    <!-- ================================== -->
+    <div class="option-modal" id="promptSelectionModal">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h3>프롬프트 선택</h3>
+                <button class="modal-close" data-modal="promptSelectionModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="prompt-modal-controls">
+                    <input type="search" id="promptSearchInput" placeholder="프롬프트 검색...">
+                    <div class="prompt-selection-info">
+                        <span id="promptSelectionCount">0</span> / <span id="promptMaxCount">3</span>
+                    </div>
+                </div>
+                <div class="prompt-list-container" id="promptListContainer">
+                    <!-- 프롬프트 목록이 여기에 동적으로 채워집니다. -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn secondary" data-modal="promptSelectionModal">취소</button>
+                <button class="modal-btn primary" id="confirmPromptSelectionBtn">선택 완료</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================== -->
+    <!--  성능 및 캐시 모달 (Performance & Cache Modal)  -->
+    <!-- ================================== -->
+    <div class="option-modal" id="performanceCacheModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>성능 및 캐시 설정</h3>
+                <button class="modal-close" data-modal="performanceCacheModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-setting-item">
+                    <label for="memoryLimitSlider">최대 메모리 사용량 (MB)</label>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <input type="range" id="memoryLimitSlider" min="100" max="4096" step="100" value="100">
+                        <span id="memoryLimitValue">100 MB</span>
+                    </div>
+                </div>
+                <div class="setting-desc">
+                    앱이 사용할 수 있는 최대 메모리 양을 설정합니다. 값이 높을수록 대용량 파일을 더 안정적으로 처리할 수 있지만, 시스템 리소스를 더 많이 사용합니다.
+                </div>
+                <hr style="margin: 20px 0;">
+                <div class="modal-setting-item">
+                    <label>캐시 관리</label>
+                    <button class="modal-btn danger" id="clearCacheBtn">모든 캐시 삭제</button>
+                </div>
+                <div class="setting-desc">
+                    분석 데이터, 임시 파일 등 앱이 저장한 모든 데이터를 삭제합니다. 문제가 발생했을 때 사용해보세요.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn secondary" data-modal="performanceCacheModal">취소</button>
+                <button class="modal-btn primary" onclick="applyPerformanceCacheOptions()">적용</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🚀 성능 최적화: 필수 유틸리티만 즉시 로드 -->
+    <script type="module" src="js/utils/event-manager.js"></script>
+    <script type="module" src="js/utils/memory-manager.js"></script>
+    <script type="module" src="js/utils/lazy-loader.js"></script>
+    <script type="module" src="js/utils/performance-monitor.js"></script>
+    
+    <!-- 🎛️ 옵션 모달 관리 -->
+    <script type="module" src="js/ui-options-modal.js"></script>
+    
+    <!-- 🎨 테마 관리 -->
+    <script type="module" src="js/ui-theme.js"></script>
+
+    <!-- 📁 파일 관리 -->
+    <script type="module" src="js/ui-file.js"></script>
+    
+    <!-- 📦 나머지 모듈들은 지연 로딩으로 처리 -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
